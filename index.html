@@ -90,7 +90,7 @@
       contenedor.innerHTML += '<div class="opcion-fila">' +
         '<input type="checkbox" id="chk_' + op + '" value="' + op + '" class="chk-rol" onchange="gestionarCasillas(\'' + op + '\')">' +
         '<label for="chk_' + op + '">' + op + '</label>' +
-        '<input type="text" inputmode="numeric" pattern="[0-9]*" id="dni_' + op + '" class="txt-dni" placeholder="DNI..." disabled maxlength="9" oninput="this.value = this.value.replace(/[^0-9]/g, \'\')">' +
+        '<input type="text" inputmode="numeric" pattern="[0-9]*" id="dni_' + op + '" class="txt-dni" placeholder="DNI..." disabled maxlength="8" oninput="this.value = this.value.replace(/[^0-9]/g, \'\')">' +
         '</div>';
     });
   }
