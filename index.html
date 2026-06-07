@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Registro Electoral</title>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #f5f5f5; -webkit-text-size-adjust: 100%; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 12px; box-sizing: border-box; }
+    .container { width: 100%; max-width: 480px; background: white; padding: 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); box-sizing: border-box; margin: 0 auto; }
+    h2 { text-align: center; color: #333; margin-top: 0; font-size: 20px; }
+    .campo { margin-bottom: 16px; }
+    label { display: block; font-weight: bold; margin-bottom: 6px; color: #555; font-size: 14px; }
+    select, input[type="time"], input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; background-color: #fff; height: 44px; font-family: inherit; }
+    select:disabled, input:disabled { background-color: #e9e9e9; color: #888; opacity: 1; -webkit-text-fill-color: #888; }
+    .miembros-box { background-color: #f9f9f9; border: 1px solid #ddd; padding: 12px; border-radius: 6px; }
+    .instruccion { margin-top: 0; font-size: 13px; color: #666; margin-bottom: 12px; }
+    .opcion-fila { display: flex; align-items: center; margin-bottom: 10px; }
+    .opcion-fila input[type="checkbox"] { width: 22px; height: 22px; margin-right: 10px; flex-shrink: 0; }
+    .opcion-fila label { font-weight: normal; width: 35px; margin-bottom: 0; font-size: 15px; display: inline-block; }
+    .opcion-fila input[type="text"] { flex-grow: 1; height: 38px; }
+    button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; height: 46px; -webkit-appearance: none; cursor: pointer; }
+    button:disabled { background-color: #99c2ff; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Registro Electoral</h2>
+  <form id="formularioElectoral">
+    
+    <div class="campo">
+      <label for="provincia">Provincia:</label>
+      <select id="provincia" onchange="actualizarDistritos()"><option value="">Cargando datos...</option></select>
+    </div>
+    <div class="campo">
+      <label for="distrito">Distrito:</label>
+      <select id="distrito" onchange="actualizarLocales()" disabled><option value="">Seleccione provincia...</option></select>
+    </div>
+    <div class="campo">
+      <label for="local">Local de Votación:</label>
+      <select id="local" onchange="actualizarMesas()" disabled><option value="">Seleccione distrito...</option></select>
+    </div>
+    <div class="campo">
+      <label for="mesa">Mesa:</label>
+      <select id="mesa" disabled><option value="">Seleccione local...</option></select>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
+
+    <div class="campo">
+      <label for="hora">1. Hora de instalación de mesa:</label>
+      <input type="time" id="hora" required>
+    </div>
+
+    <div class="campo">
+      <label>2. Registro de Miembros de Mesa Instalación (Exactamente 3):</label>
+      <div class="miembros-box" id="contenedorOpciones">
+        <p class="instruccion">Seleccione 03 cargos y digite el DNI.</p>
+      </div>
+    </div>
+    
+    <button type="button" id="btnEnviar" onclick="enviarDatos()">Enviar Registro</button>
+  </form>
+</div>
+
+<script>
+  // Reemplaza esta URL con la nueva URL de ejecución de tu Apps Script
+  var urlAPI = "https://script.google.com/macros/s/AKfycbxhIaci_Cv_yIfuw-Qtg5-gIHDr3yaFvR8qIYPxKScYQ1NB2AFbwBULaZnLTnmfWIdq/exec";
+
+  var estructuraData = {};
+  var opcionesMiembros = ['P', 'S', '3M', '1S', '2S', '3S', '4S', '5S', '6S', 'E'];
+
+  window.onload = function() {
+    generarOpcionesHTML();
+    
+    // Llamada estándar vía fetch compatible con navegadores antiguos
+    fetch(urlAPI + "?accion=obtenerData")
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        procesarEstructura(data);
+        inicializarProvincias();
+      })
+      .catch(function(err) { alert("Error al conectar con la base de datos."); });
+  };
+
+  function generarOpcionesHTML() {
+    var contenedor = document.getElementById("contenedorOpciones");
+    opcionesMiembros.forEach(function(op) {
+      contenedor.innerHTML += '<div class="opcion-fila">' +
+        '<input type="checkbox" id="chk_' + op + '" value="' + op + '" class="chk-rol" onchange="gestionarCasillas(\'' + op + '\')">' +
+        '<label for="chk_' + op + '">' + op + '</label>' +
+        '<input type="text" inputmode="numeric" pattern="[0-9]*" id="dni_' + op + '" class="txt-dni" placeholder="DNI..." disabled maxlength="9" oninput="this.value = this.value.replace(/[^0-9]/g, \'\')">' +
+        '</div>';
+    });
+  }
+
+  function gestionarCasillas(opcion) {
+    var chk = document.getElementById('chk_' + opcion);
+    var txtDni = document.getElementById('dni_' + opcion);
+    if (chk.checked) { txtDni.disabled = false; txtDni.focus(); } else { txtDni.disabled = true; txtDni.value = ""; }
+
+    var casillas = document.querySelectorAll('.chk-rol');
+    var seleccionadas = document.querySelectorAll('.chk-rol:checked').length;
+
+    for (var i = 0; i < casillas.length; i++) {
+      if (seleccionadas >= 3) {
+        if (!casillas[i].checked) casillas[i].disabled = true;
+      } else {
+        casillas[i].disabled = false;
+      }
+    }
+  }
+
+  function procesarEstructura(data) {
+    data.forEach(function(row) {
+      var prov = row[0], dist = row[1], loc = row[2], mesa = row[3];
+      if (!prov) return;
+      if (!estructuraData[prov]) estructuraData[prov] = {};
+      if (!estructuraData[prov][dist]) estructuraData[prov][dist] = {};
+      if (!estructuraData[prov][dist][loc]) estructuraData[prov][dist][loc] = [];
+      if (estructuraData[prov][dist][loc].indexOf(mesa) === -1) estructuraData[prov][dist][loc].push(mesa);
+    });
+  }
+
+  function inicializarProvincias() {
+    var provSelect = document.getElementById("provincia");
+    provSelect.innerHTML = '<option value="">Seleccione provincia...</option>';
+    Object.keys(estructuraData).sort().forEach(function(prov) {
+      provSelect.innerHTML += '<option value="' + prov + '">' + prov + '</option>';
+    });
+  }
+
+  function actualizarDistritos() {
+    var prov = document.getElementById("provincia").value;
+    document.getElementById("distrito").innerHTML = '<option value="">Seleccione distrito...</option>';
+    document.getElementById("local").innerHTML = '<option value="">Seleccione distrito...</option>';
+    document.getElementById("mesa").innerHTML = '<option value="">Seleccione local...</option>';
+    document.getElementById("local").disabled = true; document.getElementById("mesa").disabled = true;
+
+    if (!prov) { document.getElementById("distrito").disabled = true; return; }
+    Object.keys(estructuraData[prov]).sort().forEach(function(dist) {
+      document.getElementById("distrito").innerHTML += '<option value="' + dist + '">' + dist + '</option>';
+    });
+    document.getElementById("distrito").disabled = false;
+  }
+
+  function actualizarLocales() {
+    var prov = document.getElementById("provincia").value;
+    var dist = document.getElementById("distrito").value;
+    document.getElementById("local").innerHTML = '<option value="">Seleccione local...</option>';
+    document.getElementById("mesa").innerHTML = '<option value="">Seleccione local...</option>';
+    document.getElementById("mesa").disabled = true;
+
+    if (!dist) { document.getElementById("local").disabled = true; return; }
+    Object.keys(estructuraData[prov][dist]).sort().forEach(function(loc) {
+      document.getElementById("local").innerHTML += '<option value="' + loc + '">' + loc + '</option>';
+    });
+    document.getElementById("local").disabled = false;
+  }
+
+  function actualizarMesas() {
+    var prov = document.getElementById("provincia").value;
+    var dist = document.getElementById("distrito").value;
+    var loc = document.getElementById("local").value;
+    document.getElementById("mesa").innerHTML = '<option value="">Seleccione mesa...</option>';
+
+    if (!loc) { document.getElementById("mesa").disabled = true; return; }
+    estructuraData[prov][dist][loc].sort(function(a, b) { return a - b; }).forEach(function(mesa) {
+      document.getElementById("mesa").innerHTML += '<option value="' + mesa + '">Mesa ' + mesa + '</option>';
+    });
+    document.getElementById("mesa").disabled = false;
+  }
+
+  function enviarDatos() {
+    var btn = document.getElementById("btnEnviar");
+    var datos = {
+      provincia: document.getElementById("provincia").value,
+      distrito: document.getElementById("distrito").value,
+      local: document.getElementById("local").value,
+      mesa: document.getElementById("mesa").value,
+      hora: document.getElementById("hora").value,
+      miembros: []
+    };
+
+    if (!datos.provincia || !datos.distrito || !datos.local || !datos.mesa || !datos.hora) {
+      alert("Por favor, complete todos los campos.");
+      return;
+    }
+
+    var chkSeleccionados = document.querySelectorAll('.chk-rol:checked');
+    if (chkSeleccionados.length !== 3) {
+      alert("Debe seleccionar EXACTAMENTE 3 opciones.");
+      return;
+    }
+
+    for (var i = 0; i < chkSeleccionados.length; i++) {
+      var rol = chkSeleccionados[i].value;
+      var dni = document.getElementById('dni_' + rol).value;
+      if (dni.length !== 8) {
+        alert("El DNI para " + rol + " debe tener exactamente 8 dígitos.");
+        return;
+      }
+      datos.miembros.push({ rol: rol, dni: dni });
+    }
+
+    btn.disabled = true;
+    btn.innerText = "Guardando...";
+
+    // Envío seguro de datos mediante POST directo sin pasar por iframes de Google
+    fetch(urlAPI, {
+      method: "POST",
+      body: JSON.stringify(datos)
+    })
+    .then(function(res) { return res.text(); })
+    .then(function(response) {
+      btn.innerText = response;
+      btn.style.backgroundColor = "#28a745";
+      document.getElementById("formularioElectoral").reset();
+      actualizarDistritos();
+      gestionarCasillas('P');
+      
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = "Enviar Registro";
+        btn.style.backgroundColor = "#007bff";
+      }, 3000);
+    })
+    .catch(function(err) {
+      alert("Error al guardar el registro.");
+      btn.disabled = false;
+      btn.innerText = "Enviar Registro";
+    });
+  }
+</script>
+</body>
+</html>
